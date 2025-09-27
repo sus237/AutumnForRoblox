@@ -3,6 +3,7 @@ local GuiLibrary = shared.GuiLibrary
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 local TweenService = game:GetService('TweenService')
+local SoundService = game:GetService('SoundService')
 local TextChatService = game:GetService('TextChatService')
 local UserInputService = game:GetService('UserInputService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
@@ -30,6 +31,7 @@ BedwarZ = {
     PlaceBlock = ReplicatedStorage.Remotes.ItemsRemotes.PlaceBlock,
     EquipTool = ReplicatedStorage.Remotes.ItemsRemotes.EquipTool,
     MineBlock = ReplicatedStorage.Remotes.ItemsRemotes.MineBlock,
+    DropItem = ReplicatedStorage.Remotes.ItemsRemotes.DropItem,
     ShootProjectile = ReplicatedStorage.Remotes.ItemsRemotes.ShootProjectile,
 
     getMap = function()
@@ -81,20 +83,20 @@ local function getNearEntity(Range: number)
     end
 end
 
-local function getItem(get)
-    for i,v in lplr.Backpack:GetChildren() do
-        if v.Name:lower():find(get) then
-            return v
+local Inventory = {
+    getItem = function(item: string)
+        for i,v in lplr.Backpack:GetChildren() do
+            if v.Name:lower():find(item:lower()) then
+                return v
+            end
         end
-    end
-end
-local function getHoldingItem(get)
-    for i,v in lplr.Character:GetChildren() do
-        if v.Name:lower():find(get) then
-            return v
+        for _, v in lplr.Character:GetChildren() do
+            if v.Name:lower():find(item:lower()) then
+                return v
+            end
         end
-    end
-end
+    end,
+}
 
 local AuraBoxInst = Instance.new('Part')
 AuraBoxInst.Parent = workspace
@@ -126,7 +128,7 @@ Aura = Combat:CreateModule({
         if callback then
             Aura:Start(function()
                 if isAlive(lplr) then
-                    local Entity, Sword = getNearEntity(20), getHoldingItem('sword') or getItem('sword')
+                    local Entity, Sword = getNearEntity(17), Inventory.getItem('Sword')
 
                     if Entity then
                         if (lplr.Character.Humanoid.FloorMaterial ~= Enum.Material.Air) and (tick() - lastJumped) > 0.4 and AuraJump.Enabled then
@@ -135,9 +137,9 @@ Aura = Combat:CreateModule({
                         end
 
                         AuraBoxInst.CFrame = Entity.root.CFrame
-                        TweenService:Create(AuraBoxInst, TweenInfo.new(0.25), {Size = Entity.root.Size * 2.5}):Play()
+                        TweenService:Create(AuraBoxInst, TweenInfo.new(0.25), {Size = Vector3.new(4, 5, 4)}):Play()
 
-                        if Sword and (TimedHits.Enabled and (tick() - lastAttacked) > 0.1 or true) then
+                        if Sword and (tick() - lastAttacked) > 0.1 then
                             loadAnim:Stop()
                             loadAnim:Play()
 
@@ -147,7 +149,7 @@ Aura = Combat:CreateModule({
                             lastAttacked = tick()
                         end
                     else
-                        TweenService:Create(AuraBoxInst, TweenInfo.new(0.35), {
+                        TweenService:Create(AuraBoxInst, TweenInfo.new(0.25), {
                             Size = Vector3.zero
                         }):Play()
                     end
@@ -201,7 +203,7 @@ Speed = Movement:CreateModule({
                 pcall(function()
                     local MoveDir = lplr.Character.Humanoid.MoveDirection
                     local Velo = lplr.Character.PrimaryPart.AssemblyLinearVelocity
-                    local SpeedVal = (AnticheatBypass.Enabled and 75 or 23) -- lplr.Character.Humanoid.WalkSpeed
+                    local SpeedVal = (AnticheatBypass.Enabled and 80 or 23) -- lplr.Character.Humanoid.WalkSpeed
 
                     if SpeedMode.Value == 'CFrame' then
                         SpeedVal -= lplr.Character.Humanoid.WalkSpeed
@@ -254,7 +256,7 @@ Scaffold = World:CreateModule({
     ['Function'] = function(callback)
         if callback then
             Scaffold:Start(function()
-                local Wool = getItem('wool') or getHoldingItem('wool')
+                local Wool = Inventory.getItem('Wool')
 
                 if Wool then
                     local Pos = roundPos(lplr.Character.PrimaryPart.Position - Vector3.new(0, 3.5, 0) + lplr.Character.Humanoid.MoveDirection * 1)
@@ -524,17 +526,26 @@ local function modifyCharacter(character)
             
             if not character or character:FindFirstChild('PrimaryPart') then
                 return end
-            
-            if not isnetworkowner(character.PrimaryPart) then
-                clone.PrimaryPart.CFrame = character.PrimaryPart.CFrame
-            else
-                if (tick() - lastTP) > 0.135 then
-                   character.PrimaryPart.CFrame = clone.PrimaryPart.CFrame
-                   lastTP = tick()
-                end
 
-                character.PrimaryPart.Velocity = Vector3.new(0, clone.PrimaryPart.Velocity.Y, 0)
-            end
+            local Nearest = getNearEntity(22)
+            
+            pcall(function()
+                if not isnetworkowner(character.PrimaryPart) then
+                    clone.PrimaryPart.CFrame = character.PrimaryPart.CFrame
+                else
+                    if (tick() - lastTP) > 0.14 then
+                        character.PrimaryPart.CFrame = clone.PrimaryPart.CFrame
+                        lastTP = tick()
+                    end
+
+                    if (character.PrimaryPart.CFrame.Position - clone.PrimaryPart.CFrame.Position).Magnitude > 10 then
+                        character.PrimaryPart.CFrame = clone.PrimaryPart.CFrame
+                        lastTP = tick()
+                    end
+
+                    character.PrimaryPart.Velocity = Vector3.new(0, clone.PrimaryPart.Velocity.Y, 0)
+                end
+            end)
         end))
     end
 end
@@ -591,16 +602,16 @@ Longjump = Movement:CreateModule({
             end
 
             local startTick = tick()
-            local startY = 26
+            local startY = 30
             Longjump:Start(function(deltaTime)
                 local MoveDir = lplr.Character.Humanoid.MoveDirection
-                local expSpeed = (AnticheatBypass.Enabled and 75 or 23)
+                local expSpeed = (AnticheatBypass.Enabled and 85 or 23)
 
-                if (tick() - startTick) < 0.25 then
+                if (tick() - startTick) < 0.35 then
                     lplr.Character.PrimaryPart.Velocity = Vector3.zero
                 else
                     lplr.Character.PrimaryPart.Velocity = Vector3.new(MoveDir.X * expSpeed, startY, MoveDir.Z * expSpeed)
-                    startY -= (36 * deltaTime)
+                    startY -= (45 * deltaTime)
                 end
             end)
         else
@@ -664,14 +675,12 @@ local function getNearestBed(Range: number)
 
             if Hitbox then
                 local Dist = lplr:DistanceFromCharacter(Hitbox.Position)
-
                 if Dist <= Range then
-                    return v, Hitbox
+                    return Hitbox, Dist
                 end
             end
         end
     end
-    return nil
 end
 
 if not BedwarZ.MathUtils then
@@ -690,11 +699,11 @@ Breaker = World:CreateModule({
     ["Function"] = function(callback)
         if callback then
             Breaker:Start(function()
-                local Bed, Hitbox = getNearestBed(30)
-                local Item = getItem("pickaxe") or getHoldingItem("pickaxe")
+                local Bed, Dist = getNearestBed(30)
+                local Item = Inventory.getItem('Pickaxe')
 
                 if Bed and Item and lplr.Character and lplr.Character.PrimaryPart then
-                    local screenPos = workspace.CurrentCamera:WorldToViewportPoint(Hitbox.Position)
+                    local screenPos = workspace.CurrentCamera:WorldToViewportPoint(Bed.Position)
                     local vpoint = workspace.CurrentCamera:ViewportPointToRay(screenPos.X, screenPos.Y)
                     local ray = workspace:Raycast(vpoint.Origin, vpoint.Direction * 18, rayParamsBreaker)
                     local blockPos = snapToGrid(ray)
@@ -709,6 +718,35 @@ Breaker = World:CreateModule({
                         fakeOrigin,
                         fakeDirection
                     )
+                end
+            end)
+        end
+    end
+})
+
+local old = SoundService.AmbientReverb
+SoundReverb = World:CreateModule({
+    ['Name'] = 'Sound Reverb',
+    ['Function'] = function(callback)
+        if callback then
+            SoundService.AmbientReverb = Enum.ReverbType.SewerPipe
+        else
+            SoundService.AmbientReverb = old
+        end
+    end
+})
+
+FastPickup = World:CreateModule({
+    ['Name'] = 'FastPickup',
+    ['Function'] = function(callback)
+        if callback then
+            FastPickup:Start(function()
+                for i,v in workspace.DroppedItemsContainer:GetChildren() do
+                    local Dist = lplr:DistanceFromCharacter(v.Hitbox.Position)
+
+                    if Dist <= 6 then
+                        v:WaitForChild('Hitbox').CFrame = lplr.Character.PrimaryPart.CFrame - Vector3.new(0, 3, 0)
+                    end
                 end
             end)
         end

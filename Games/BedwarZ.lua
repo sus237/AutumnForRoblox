@@ -33,6 +33,7 @@ BedwarZ = {
     MineBlock = ReplicatedStorage.Remotes.ItemsRemotes.MineBlock,
     DropItem = ReplicatedStorage.Remotes.ItemsRemotes.DropItem,
     ShootProjectile = ReplicatedStorage.Remotes.ItemsRemotes.ShootProjectile,
+    VeloUtils = ReplicatedStorage.Modules.VelocityUtils,
 
     getMap = function()
         return ReplicatedStorage.GameInfo.Map.Value
@@ -112,6 +113,8 @@ AuraBoxInst.Anchored = true
 local SwingAnim = Instance.new('Animation')
 SwingAnim.AnimationId = 'rbxassetid://123800159244236'
 local loadAnim = lplr.Character.Humanoid:LoadAnimation(SwingAnim)
+local NewSound = ReplicatedStorage.ToolHandlers.Sword.Sounds.Swing1:Clone()
+NewSound.Parent = workspace
 
 lplr.CharacterAdded:Connect(function(character)
     repeat
@@ -126,6 +129,7 @@ Aura = Combat:CreateModule({
     ['Name'] = 'Aura',
     ['Function'] = function(callback)
         if callback then
+            local lastHp = lplr.Character.Humanoid.Health
             Aura:Start(function()
                 if isAlive(lplr) then
                     local Entity, Sword = getNearEntity(17), Inventory.getItem('Sword')
@@ -139,15 +143,23 @@ Aura = Combat:CreateModule({
                         AuraBoxInst.CFrame = Entity.root.CFrame
                         TweenService:Create(AuraBoxInst, TweenInfo.new(0.25), {Size = Vector3.new(4, 5, 4)}):Play()
 
-                        if Sword and (tick() - lastAttacked) > 0.1 then
-                            loadAnim:Stop()
-                            loadAnim:Play()
+                        if Sword and (tick() - lastAttacked) > 0.2 then
+                            if SwingSword.Enabled then
+                                loadAnim:Stop()
+                                loadAnim:Play()
+                            end
+
+                            if PlaySound.Enabled then
+                               NewSound:Play() 
+                            end
 
                             BedwarZ.EquipTool:FireServer(Sword.Name)
                             BedwarZ.SwordHit:FireServer(Sword.Name, Entity.char)
 
                             lastAttacked = tick()
                         end
+
+                        lastHp = Entity.char.Humanoid.Health
                     else
                         TweenService:Create(AuraBoxInst, TweenInfo.new(0.25), {
                             Size = Vector3.zero
@@ -163,6 +175,12 @@ TimedHits = Aura.CreateToggle({
 })
 AuraBox = Aura.CreateToggle({
     ['Name'] = 'Enemy Box',
+})
+SwingSword = Aura.CreateToggle({
+    ['Name'] = 'Swing',
+})
+PlaySound = Aura.CreateToggle({
+    ['Name'] = 'Play Sound',
 })
 AuraJump = Aura.CreateToggle({
     ['Name'] = 'Auto Jump',
@@ -203,7 +221,7 @@ Speed = Movement:CreateModule({
                 pcall(function()
                     local MoveDir = lplr.Character.Humanoid.MoveDirection
                     local Velo = lplr.Character.PrimaryPart.AssemblyLinearVelocity
-                    local SpeedVal = (AnticheatBypass.Enabled and 80 or 23) -- lplr.Character.Humanoid.WalkSpeed
+                    local SpeedVal = (AnticheatBypass.Enabled and 60 or 23) -- lplr.Character.Humanoid.WalkSpeed
 
                     if SpeedMode.Value == 'CFrame' then
                         SpeedVal -= lplr.Character.Humanoid.WalkSpeed
@@ -273,19 +291,6 @@ Scaffold = World:CreateModule({
                     end)
                 end
             end)
-        end
-    end
-})
-
-Respawn = Exploit:CreateModule({
-    ['Name'] = 'Respawn',
-    ['Function'] = function(callback)
-        if callback then
-            if lplr.Team == game.Teams.Spectators then
-                ReplicatedStorage.Remotes.GameRemotes.Join:FireServer()
-            end
-            task.wait(0.1)
-            Respawn:Toggle()
         end
     end
 })
@@ -495,8 +500,10 @@ local function createClone()
         end
     end
 
-    oldChar.PrimaryPart.Transparency = 1
-    oldChar.Head.face.Transparency = 1
+    oldChar.PrimaryPart.Transparency = 0.5
+    pcall(function()
+        oldChar.Head.face.Transparency = 1
+    end)
     return clone, oldChar
 end
 
@@ -526,23 +533,17 @@ local function modifyCharacter(character)
             
             if not character or character:FindFirstChild('PrimaryPart') then
                 return end
-
-            local Nearest = getNearEntity(22)
             
             pcall(function()
                 if not isnetworkowner(character.PrimaryPart) then
                     clone.PrimaryPart.CFrame = character.PrimaryPart.CFrame
                 else
-                    if (tick() - lastTP) > 0.14 then
-                        character.PrimaryPart.CFrame = clone.PrimaryPart.CFrame
+                    if (tick() - lastTP) > 0.4 then
+                        TweenService:Create(character.PrimaryPart, TweenInfo.new(0.55), {CFrame = clone.PrimaryPart.CFrame}):Play()
                         lastTP = tick()
                     end
 
-                    if (character.PrimaryPart.CFrame.Position - clone.PrimaryPart.CFrame.Position).Magnitude > 10 then
-                        character.PrimaryPart.CFrame = clone.PrimaryPart.CFrame
-                        lastTP = tick()
-                    end
-
+                    character.PrimaryPart.CFrame = CFrame.new(character.PrimaryPart.CFrame.X, clone.PrimaryPart.CFrame.Y, character.PrimaryPart.CFrame.Z)
                     character.PrimaryPart.Velocity = Vector3.new(0, clone.PrimaryPart.Velocity.Y, 0)
                 end
             end)
@@ -605,7 +606,7 @@ Longjump = Movement:CreateModule({
             local startY = 30
             Longjump:Start(function(deltaTime)
                 local MoveDir = lplr.Character.Humanoid.MoveDirection
-                local expSpeed = (AnticheatBypass.Enabled and 85 or 23)
+                local expSpeed = (AnticheatBypass.Enabled and 60 or 23)
 
                 if (tick() - startTick) < 0.35 then
                     lplr.Character.PrimaryPart.Velocity = Vector3.zero
@@ -631,13 +632,13 @@ TargetStrafe = Combat:CreateModule({
         if callback then
             local Angle = 0
             TargetStrafe:Start(function(deltaTime)
-                local Nearest = getNearEntity(14)
+                local Nearest = getNearEntity(11)
 
                 if Nearest then
                     Angle += math.rad(AnticheatBypass.Enabled and 1000 or 180) * deltaTime
 
-                    local X = math.cos(Angle) * 5
-                    local Z = math.sin(Angle) * 5
+                    local X = math.cos(Angle) * 7
+                    local Z = math.sin(Angle) * 7
 
                     local expPos = Nearest.root.Position + Vector3.new(X, 0, Z)
 
@@ -748,6 +749,21 @@ FastPickup = World:CreateModule({
                         v:WaitForChild('Hitbox').CFrame = lplr.Character.PrimaryPart.CFrame - Vector3.new(0, 3, 0)
                     end
                 end
+            end)
+        end
+    end
+})
+
+Velocity = Combat:CreateModule({
+    ['Name'] = 'Velocity',
+    ['Function'] = function(callback)
+        if callback then
+            for i,v in BedwarZ.VeloUtils:GetChildren() do
+                v:Destroy()
+            end
+
+            BedwarZ.VeloUtils.ChildAdded:Connect(function(c)
+                c:Destroy()
             end)
         end
     end

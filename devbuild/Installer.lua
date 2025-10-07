@@ -1,4 +1,4 @@
-local base = "https://raw.githubusercontent.com/AutumnV3/AutumnForRoblox/refs/heads/main/devbuild/"
+local base = "https://raw.githubusercontent.com/sus237/AutumnForRoblox/refs/heads/main/devbuild/"
 
 local function getDownload(file)
     file = file:gsub('AutumnV3/', '')

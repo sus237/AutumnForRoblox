@@ -4,7 +4,7 @@ if shared.Restart then
 end
 
 if not isfolder('AutumnV3') then
-	loadstring(game:HttpGet('https://raw.githubusercontent.com/AutumnV3/AutumnForRoblox/refs/heads/main/Installer.lua'))()
+	loadstring(game:HttpGet('https://raw.githubusercontent.com/sus237/AutumnForRoblox/refs/heads/main/Installer.lua'))()
 end
 
 local GuiLibrary = loadfile('AutumnV3/GuiLibrary.lua')()
